@@ -1,6 +1,6 @@
-(ns projecteuler.problem10)
+(ns idozorenko.projecteuler.problem7)
 
-(reduce +
-  (take-while #(< % 2E6)
+(first
+  (drop 1E4
     (filter #(.isProbablePrime (BigInteger. (str %)) 7)
       (iterate inc 1))))
