@@ -2,11 +2,11 @@
   (:require [clojure.math.combinatorics :as combo]))
 
 (def data
-  {:nationality [:englishman :swede :dane :norwegian :german]
-  :color [:red :white :blue :yellow :green]
+  {:nationality [:englishman :swede :dane :german]
+  :color [:red :white :yellow :green]
   :pet [:dogs :birds :cats :horses :fish]
   :cigarettes [:pall_mall :dunhills :blend :blue_masters :prince]
-  :drink [:tea :coffee :milk :bier :water]})
+  :drink [:tea :coffee :bier :water]})
 
 (defn find-first-index
   [pred coll]
@@ -87,11 +87,19 @@
 
 (defn generator []
   (combo/cartesian-product
-    (combo/permutations (:nationality data))
-    (combo/permutations (:color data))
+    (map
+      #(cons :norwegian %)
+      (combo/permutations (:nationality data)))
+    (map
+      #(let [[s e] (split-at 1 %)]
+        (concat s [:blue] e))
+      (combo/permutations (:color data)))
     (combo/permutations (:pet data))
     (combo/permutations (:cigarettes data))
-    (combo/permutations (:drink data))))
+    (map
+      #(let [[s e] (split-at 2 %)]
+        (concat s [:milk] e))
+      (combo/permutations (:drink data)))))
 
 (defn solve []
   (->> (generator)
