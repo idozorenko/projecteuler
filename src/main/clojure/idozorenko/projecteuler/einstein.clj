@@ -74,13 +74,18 @@
       (= 1 (Math/abs
              (- (find-first-index #(= :blend (:cigarettes %)) houses)
                (find-first-index #(= :cats (:pet %)) houses))))
-      (= (inc (find-first-index #(= :dunhills (:cigarettes %)) houses))
-        (find-first-index #(= :horses (:pet %)) houses))
+      (some (fn [{:keys [drink cigarettes]}]
+              (and (= :bier drink) (= :blue_masters cigarettes)))
+        houses)
+      (= 1 (Math/abs
+             (- (find-first-index #(= :dunhills (:cigarettes %)) houses)
+               (find-first-index #(= :horses (:pet %)) houses))))
       (some (fn [{:keys [nationality cigarettes]}]
               (and (= :german nationality) (= :prince cigarettes)))
         houses)
-      (= (inc (find-first-index #(= :blue (:color %)) houses))
-        (find-first-index #(= :norwegian (:nationality %)) houses))
+      (= 1 (Math/abs
+             (- (find-first-index #(= :blue (:color %)) houses)
+               (find-first-index #(= :norwegian (:nationality %)) houses))))
       (= 1 (Math/abs
              (- (find-first-index #(= :blend (:cigarettes %)) houses)
                (find-first-index #(= :water (:drink %)) houses)))))))
@@ -102,6 +107,16 @@
       (combo/permutations (:drink data)))))
 
 (defn solve []
-  (->> (generator)
-    (drop-while #(not (meets-requirements? %)))
-    (first)))
+  (let [cnt (atom 0)]
+    (->> (generator)
+      (drop-while #(do
+                    (when (zero? (mod (swap! cnt inc) 1E5))
+                      (println "Processed " @cnt))
+                    (not (meets-requirements? %))))
+      (first))))
+
+'((:norwegian :yellow :cats :dunhills :water)
+   (:dane :blue :horses :blend :tea)
+   (:englishman :red :birds :pall_mall :milk)
+   (:german :green :fish :prince :coffee)
+   (:swede :white :dogs :blue_masters :bier))
