@@ -26,7 +26,7 @@
     (doseq [row row-group]
       (doseq [col-group (partition 3 row)]
         (doseq [value col-group]
-          (print value " "))
+          (print value (if (< 2 (count value)) "\t" "\t\t")))
         (print " "))
       (println))
     (println))
@@ -163,10 +163,66 @@
           [[row-idx col-idx] value])
         result))))
 
+(defn remove-naked-pair-from-blocks [candidates]
+  (mapv
+    (fn [batch]
+      (let [naked-pairs (->> batch
+                          (group-by identity)
+                          (filter (fn [[k v]] (and (= 2 (count k)) (= 2 (count v)))))
+                          (keys)
+                          (set))
+            exclude (apply set/union naked-pairs)]
+        (->> batch
+          (mapv #(if (contains? naked-pairs %) % (set/difference % exclude))))))
+    candidates))
+
+(defn remove-naked-pairs [candidates]
+  (loop [candidates candidates]
+    (let [new-candidates (-> (rows candidates)
+                           (remove-naked-pair-from-blocks))
+          new-candidates (-> (cols new-candidates)
+                           (remove-naked-pair-from-blocks)
+                           (cols))
+          new-candidates (-> (boxes new-candidates)
+                           (remove-naked-pair-from-blocks)
+                           (boxes))]
+      (if (= new-candidates candidates)
+        candidates
+        (recur new-candidates)))))
+
+(defn deduce-only-choice2 [sudoku]
+  (let [rows (rows sudoku)
+        cols (cols sudoku)
+        boxes (boxes sudoku)
+        candidates (atom (vec (repeat 9 (vec (repeat 9 #{})))))
+        get-candidates
+        (fn [[row-idx col-idx :as cell]]
+          (let [row (set (nth rows row-idx))
+                col (set (nth cols col-idx))
+                box (set (nth boxes (box-idx cell)))]
+            (set/difference full-row-set row col box)))
+        get-first-candidate
+        (fn [candidates]
+          (first
+            (for [i (range 9) j (range 9) :let [cell-candidates (get-in candidates [i j])] :when (= 1 (count cell-candidates))]
+              [[i j] (first cell-candidates)])))]
+    (doseq [i (range 9)
+            j (range 9)]
+      (let [cell [i j]]
+        (when (not (defined-value? (get-in sudoku cell)))
+          (swap! candidates assoc-in cell (get-candidates cell)))))
+    (let [candidate (get-first-candidate @candidates)]
+      (if candidate
+        candidate
+        (let [candidates (remove-naked-pairs @candidates)]
+          #_(pprint candidates nil)
+          (get-first-candidate candidates))))))
+
 (defn deduce-next-cell [sudoku]
-  (let [fns [deduce-only-choice-left-in-row
-             deduce-only-choice-left-in-box
-             deduce-only-choice]]
+  (let [fns [deduce-only-choice
+             deduce-only-choice2
+             deduce-only-choice-left-in-row
+             deduce-only-choice-left-in-box]]
     (first (->> fns
              (map #(% sudoku))
              (filter second)))))
@@ -181,7 +237,7 @@
           (if (nil? value)
             [:no_solution sudoku]
             (let [sudoku (assoc-in sudoku cell value)]
-              (pprint sudoku cell)
+              #_(pprint sudoku cell)
               (recur sudoku))))))))
 
 
@@ -202,16 +258,16 @@
 
 
 (defn try-guess-next-cell [sudoku guesses]
-  (println "> " guesses)
+  #_(println "> " guesses)
   (loop [failed-guesses {}]
     (let [[cell guess] (get-best-guess sudoku failed-guesses)]
-      (println cell guess)
+      #_(println cell guess)
       (if-not guess
         [:no_solution nil]
         (let [sudoku (assoc-in sudoku cell guess)
               [result sudoku] (solve-by-deduction sudoku)]
           (if (= result :solved)
-            sudoku
+            [:solved sudoku]
             (if-let [result (if (= result :no_solution)
                               (let [result (try-guess-next-cell sudoku (conj guesses [cell guess]))]
                                 (if (not= :no_solution (first result))
@@ -224,5 +280,14 @@
     (if (= :not_valid sudoku)
       (println "NOT VALID!")
       (if (not= :no_solution result)
-        sudoku
+        [:solved sudoku]
         (try-guess-next-cell sudoku [])))))
+
+(defn solve []
+  (->> sudokus
+    (map solve-with-heuristics)
+    (map second)
+    (map #(let [[h t o] (->> (first %)
+                          (take 3))]
+           (+ (* 100 h) (* 10 t) o)))
+    (reduce +)))
